@@ -9,11 +9,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import pro.sky.telegrambot.repository.NotificationTaskRepository;
-import pro.sky.telegrambot.model.NotificationTask;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import pro.sky.telegrambot.service.NotificationTaskService;
 
 import javax.annotation.PostConstruct;
 import java.util.List;
@@ -23,6 +19,9 @@ public class TelegramBotUpdatesListener implements UpdatesListener {
 
     @Autowired
     private NotificationTaskRepository notificationTaskRepository;
+
+    @Autowired
+    private NotificationTaskService notificationTaskService;
 
     private Logger logger = LoggerFactory.getLogger(TelegramBotUpdatesListener.class);
 
@@ -45,7 +44,7 @@ public class TelegramBotUpdatesListener implements UpdatesListener {
                 if (text.equals("/start")) {
                     sendWelcomeMessage(chatId);
                 } else {
-                    processReminderMessage(chatId, text);
+                    notificationTaskService.processReminderMessage(chatId, text);
                 }
             }
         });
@@ -58,34 +57,4 @@ public class TelegramBotUpdatesListener implements UpdatesListener {
         telegramBot.execute(new SendMessage(chatId, welcomeMessage));
     }
 
-    private void processReminderMessage(Long chatId, String text) {
-        Pattern pattern = Pattern.compile("(\\d{2}\\.\\d{2}\\.\\d{4}\\s\\d{2}:\\d{2})(\\s+)(.+)");
-        Matcher matcher = pattern.matcher(text);
-
-        if (matcher.matches()) {
-            String dateTimeString = matcher.group(1);
-            String reminderText = matcher.group(3);
-
-            try {
-                LocalDateTime dateTime = LocalDateTime.parse(dateTimeString,
-                        DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm"));
-
-                NotificationTask task = new NotificationTask();
-                task.setChatId(chatId);
-                task.setMessage(reminderText);
-                task.setNotificationDateTime(dateTime);
-
-                notificationTaskRepository.save(task);
-
-                String response = "Напоминание создано: " + dateTimeString + " - " + reminderText;
-                telegramBot.execute(new SendMessage(chatId, response));
-            } catch (Exception e) {
-                String errorMessage = "Неверный формат даты и времени. Используйте формат ДД.ММ.ГГГГ ЧЧ:ММ";
-                telegramBot.execute(new SendMessage(chatId, errorMessage));
-            }
-        } else {
-            String errorMessage = "Неверный формат сообщения. Используйте: ДД.ММ.ГГГГ ЧЧ:ММ Текст напоминания";
-            telegramBot.execute(new SendMessage(chatId, errorMessage));
-        }
-    }
 }
